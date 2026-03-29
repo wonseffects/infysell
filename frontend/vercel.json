@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://infysell-api-placeholder.onrender.com/api/$1"
+      "destination": "https://infysell.onrender.com/api/$1"
     },
     {
       "source": "/(.*)",
