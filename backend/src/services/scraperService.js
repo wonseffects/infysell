@@ -1,9 +1,9 @@
 const puppeteer = require('puppeteer');
 
-const scrapeGoogleMaps = async (niche, maxResults = 50) => {
+const scrapeGoogleMaps = async (queryOrUrl, maxResults = 50, isUrl = false) => {
   let browser;
   try {
-    console.log(`Starting advanced scrape for niche: ${niche}`);
+    console.log(`Starting extraction: ${isUrl ? 'URL' : 'Niche'}: ${queryOrUrl}`);
     browser = await puppeteer.launch({ 
       headless: "new",
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
@@ -13,8 +13,8 @@ const scrapeGoogleMaps = async (niche, maxResults = 50) => {
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36');
     
     // 1. Buscamos as empresas no Google Maps
-    const query = encodeURIComponent(niche);
-    await page.goto(`https://www.google.com/maps/search/${query}`, { waitUntil: 'networkidle2' });
+    const url = isUrl ? queryOrUrl : `https://www.google.com/maps/search/${encodeURIComponent(queryOrUrl)}`;
+    await page.goto(url, { waitUntil: 'networkidle2' });
 
     const businesses = [];
     

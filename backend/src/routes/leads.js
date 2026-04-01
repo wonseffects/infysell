@@ -7,11 +7,11 @@ const Lead = require('../models/Lead');
 // POST /api/leads/scrape
 router.post('/scrape', authMiddleware, async (req, res) => {
   try {
-    const { niche, campaignId } = req.body;
-    if (!niche) return res.status(400).json({ message: 'Niche is required' });
+    const { niche, campaignId, isUrl } = req.body;
+    if (!niche) return res.status(400).json({ message: 'Niche or URL is required' });
 
     // Run scraper (max 100 leads)
-    const rawLeads = await scraperService.scrapeGoogleMaps(niche, 100);
+    const rawLeads = await scraperService.scrapeGoogleMaps(niche, 100, isUrl);
 
     // Save leads to DB if campaignId provided
     let savedLeads = [];
@@ -36,11 +36,29 @@ router.post('/scrape', authMiddleware, async (req, res) => {
   }
 });
 
-// GET /api/leads/:campaignId
-router.get('/:campaignId', authMiddleware, async (req, res) => {
+
+// POST /api/leads/bulk
+router.post('/bulk', authMiddleware, async (req, res) => {
   try {
-    const leads = await Lead.find({ campaignId: req.params.campaignId, userId: req.user._id });
-    res.json({ leads });
+    const { emails, campaignId } = req.body;
+    if (!emails || !Array.isArray(emails)) {
+      return res.status(400).json({ message: 'A list of emails is required' });
+    }
+
+    const leadsToSave = emails.map((email) => ({
+      campaignId,
+      userId: req.user._id,
+      name: email.split('@')[0], // Fallback name from email
+      email: email.trim(),
+      businessName: 'Importação Manual',
+    }));
+
+    const savedLeads = await Lead.insertMany(leadsToSave);
+
+    res.json({
+      count: savedLeads.length,
+      leads: savedLeads,
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

@@ -4,9 +4,9 @@ const Lead = require('../models/Lead');
 const User = require('../models/User');
 const smtpService = require('./smtpService');
 
-// Run every minute to check for scheduled campaigns
-cron.schedule('* * * * *', async () => {
-  console.log('--- Cron Check: Processing campaigns ---');
+
+const processAllCampaigns = async () => {
+  console.log('--- Processing campaigns (Triggered) ---');
   
   const now = new Date();
   const currentTime = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
@@ -18,18 +18,33 @@ cron.schedule('* * * * *', async () => {
       'schedule.startDate': { $lte: now }
     });
 
+    console.log(`Found ${campaigns.length} active/scheduled campaigns.`);
+
     for (const campaign of campaigns) {
-      if (campaign.schedule.time === currentTime) {
+      // If it's the exact time OR if it's already "running" (meaning it's mid-sequence)
+      // On Vercel, we might just want to process whatever is due for the day.
+      if (campaign.schedule.time === currentTime || campaign.status === 'running') {
         await processCampaignDay(campaign);
       }
     }
   } catch (err) {
     console.error('Scheduler Error:', err);
   }
-});
+};
+
+// Run every minute to check for scheduled campaigns (Local Dev only, won't persist on Vercel)
+cron.schedule('* * * * *', processAllCampaigns);
 
 const processCampaignDay = async (campaign) => {
   try {
+    // Evitar processar a mesma campanha múltiplas vezes no mesmo minuto se disparado por múltiplos gatilhos
+    const lastSent = campaign.lastSentAt ? new Date(campaign.lastSentAt) : null;
+    const now = new Date();
+    if (lastSent && (now - lastSent) < 50000) { // Menos de 50s atrás
+        console.log(`Campaign ${campaign._id} already processed recently. Skipping.`);
+        return;
+    }
+
     console.log(`Processing Campaign: ${campaign.name} (Day ${campaign.currentDay + 1})`);
     
     const user = await User.findById(campaign.userId);
@@ -49,13 +64,15 @@ const processCampaignDay = async (campaign) => {
     const emailTemplate = campaign.emails[dayIndex];
     
     // Find leads for this campaign that haven't received THIS day's email
+    // We use a simplified check: currentDay of campaign vs lead records
     const leads = await Lead.find({
       campaignId: campaign._id,
-      sent: false // Simplified: in a real app, we'd track per-day sent status
-    }).limit(100); 
+      sent: false 
+    }).limit(50); // Lotes menores para Vercel (evitar timeout)
 
     if (leads.length === 0) {
-      console.log(`No more leads for campaign ${campaign._id}`);
+      console.log(`No more leads for campaign ${campaign._id} for this day.`);
+      // Se não há mais leads, incrementamos o dia para a próxima execução
       campaign.currentDay += 1;
       if (campaign.currentDay >= 5) campaign.status = 'completed';
       await campaign.save();
@@ -76,21 +93,23 @@ const processCampaignDay = async (campaign) => {
       }
     }
 
-    campaign.sentToday = sentCount;
+    campaign.sentToday = (campaign.sentToday || 0) + sentCount;
     campaign.sentTotal += sentCount;
     campaign.status = 'running';
     campaign.lastSentAt = new Date();
     
-    // Move to next day for next cron run (if it's a daily schedule)
-    // In this MVP, we just increment. A more complex system would handle 
-    // exact dates for each of the 5 days.
-    campaign.currentDay += 1;
-    if (campaign.currentDay >= 5) campaign.status = 'completed';
-    
+    // IMPORTANTE: Só incrementamos o currentDay se realmente terminarmos todos os leads do dia.
+    // Como estamos usando limit(50), podemos precisar de múltiplas rodadas do cron para terminar o dia.
+    // O check leads.length === 0 acima cuida disso na próxima rodada.
+
     await campaign.save();
     console.log(`Campaign ${campaign._id} updated. Sent ${sentCount} emails.`);
 
   } catch (err) {
     console.error(`Error processing campaign ${campaign._id}:`, err);
   }
+};
+
+module.exports = {
+    processAllCampaigns
 };

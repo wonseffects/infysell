@@ -5,6 +5,9 @@ const useOnboardingStore = create((set) => ({
   data: {
     smtp: null,
     niche: '',
+    manualLeads: '',
+    mapsLink: '',
+    extractionMethod: 'niche', // 'niche', 'manual', 'link'
     groqKey: '',
     campaignDetails: {
       objective: '',
@@ -34,7 +37,16 @@ const useOnboardingStore = create((set) => ({
 
   reset: () => set({ 
     step: 1, 
-    data: { smtp: null, niche: '', groqKey: '', campaignDetails: { objective: '', offerLink: '', emails: [] }, schedule: { startDate: null, time: '08:00' } } 
+    data: { 
+      smtp: null, 
+      niche: '', 
+      manualLeads: '',
+      mapsLink: '',
+      extractionMethod: 'niche',
+      groqKey: '', 
+      campaignDetails: { objective: '', offerLink: '', emails: [] }, 
+      schedule: { startDate: null, time: '08:00' } 
+    } 
   })
 }));
 

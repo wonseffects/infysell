@@ -40,11 +40,14 @@ export default function Step6_Progress() {
         setProgress(20);
         await new Promise(r => setTimeout(r, 1500));
 
-        // Step 2: Extraction
+        // Step 2: Extraction/Import
         setCurrentStep(1);
         setProgress(40);
+        
         const campaignRes = await axios.post('/api/campaigns', {
-          niche: data.niche,
+          name: data.extractionMethod === 'niche' ? `Campanha ${data.niche}` : 
+                data.extractionMethod === 'manual' ? 'Campanha Lista Manual' : 'Campanha Link Maps',
+          niche: data.niche || 'Manual/Link',
           objective: data.campaignDetails.objective,
           offerLink: data.campaignDetails.offerLink,
           emails: data.campaignDetails.emails,
@@ -53,10 +56,21 @@ export default function Step6_Progress() {
         
         const campaignId = campaignRes.data.campaign._id;
 
-        await axios.post('/api/leads/scrape', { 
-          niche: data.niche, 
-          campaignId 
-        }, { headers: { Authorization: `Bearer ${token}` } });
+        if (data.extractionMethod === 'manual') {
+          // Importação Manual
+          const emailsArray = data.manualLeads.split('\n').map(e => e.trim()).filter(e => e.includes('@'));
+          await axios.post('/api/leads/bulk', { 
+            emails: emailsArray, 
+            campaignId 
+          }, { headers: { Authorization: `Bearer ${token}` } });
+        } else {
+          // Scraper (Niche ou Link)
+          await axios.post('/api/leads/scrape', { 
+            niche: data.extractionMethod === 'niche' ? data.niche : data.mapsLink, 
+            campaignId,
+            isUrl: data.extractionMethod === 'link'
+          }, { headers: { Authorization: `Bearer ${token}` } });
+        }
         
         // 3. AI Generation (Already generated in step 4, just simulating UI)
         setCurrentStep(2);

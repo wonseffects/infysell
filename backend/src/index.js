@@ -11,6 +11,7 @@ const campaignRoutes = require('./routes/campaigns');
 const leadRoutes = require('./routes/leads');
 const smtpRoutes = require('./routes/smtp');
 const aiRoutes = require('./routes/ai');
+const cronRoutes = require('./routes/cron');
 
 require('./services/schedulerService');
 
@@ -18,8 +19,8 @@ const app = express();
 
 // Middleware
 app.use(cors({ origin: 'http://localhost:5173', credentials: true }));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50mb' })); // Aumentado para suportar listas grandes de leads
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(passport.initialize());
 
 // Routes
@@ -28,6 +29,7 @@ app.use('/api/campaigns', campaignRoutes);
 app.use('/api/leads', leadRoutes);
 app.use('/api/smtp', smtpRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/cron', cronRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
